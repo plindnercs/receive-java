@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
@@ -22,12 +23,13 @@ public class Packet implements Serializable {
 
     public Packet(byte[] data, int len) throws Exception {
         this(
-                (short) getUIntAt(data, 0),
-                getUByteAt(data, 4),
-                switch (getUByteAt(data, 5)) {
+                ByteBuffer.wrap(data, 0, 2).getShort(),
+                //getUShortAt(data, 0),
+                getUIntAt(data, 2),
+                switch (getUByteAt(data, 7)) {
                     case (byte) 0x00 -> new InitializePacketBody(
-                            (int) getULongAt(data, HEADER_SIZE),
-                            getStringAt(data, HEADER_SIZE + 8, len - (HEADER_SIZE + 8)).toCharArray()
+                            getUIntAt(data, HEADER_SIZE),
+                            getStringAt(data, HEADER_SIZE + 4, len - (HEADER_SIZE + 4)).toCharArray()
                     );
                     case (byte) 0x01 -> new DataPacketBody(
                             getByteArrayAt(data, HEADER_SIZE, len - HEADER_SIZE)
@@ -38,6 +40,10 @@ public class Packet implements Serializable {
                     default -> throw new Exception("unknown packet type");
                 }
         );
+    }
+
+    private static short getUShortAt(byte[] data, int index) {
+        return (short)(((data[index] & 0xFF) << 8) | (data[index + 1] & 0xFF));
     }
 
     private static int getUIntAt(byte[] data, int index) {

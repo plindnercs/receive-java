@@ -34,7 +34,7 @@ public class Receiver {
                 socket.receive(udpPacket);
                 Packet packet = new Packet(udpPacket.getData(), udpPacket.getLength());
                 if (packet.getSequenceNumber() % 1 == 0 || !(packet.getPacketBody() instanceof DataPacketBody)) {
-                    //System.out.println("Received Packet " + packet);
+                    System.out.println("Received Packet " + packet);
                 }
                 if (packet.getPacketBody() instanceof InitializePacketBody) {
                     System.out.println("rec inf at " + System.currentTimeMillis());
@@ -44,6 +44,7 @@ public class Receiver {
                 int transmissionId = transmissionId(packet.getTransmissionId(), udpPacket.getAddress(), udpPacket.getPort());
                 sequencer.push(packet, transmissionId);
             } catch (Exception e) {
+                System.err.println(e);
                 System.out.println("Discarded Packet with content [" +
                         new String(udpPacket.getData(), 0, udpPacket.getLength()) + "]");
             }
