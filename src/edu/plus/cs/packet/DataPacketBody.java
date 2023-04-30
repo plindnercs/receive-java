@@ -1,6 +1,7 @@
 package edu.plus.cs.packet;
 
 import java.io.Serializable;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 public class DataPacketBody extends PacketBody implements Serializable {
@@ -17,7 +18,7 @@ public class DataPacketBody extends PacketBody implements Serializable {
     @Override
     public String toString() {
         return "DataPacketBody{" +
-                "data=" + Arrays.toString(data) +
+                "data=" + new String(data, StandardCharsets.UTF_8) +
                 '}';
     }
 }

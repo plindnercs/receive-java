@@ -39,7 +39,7 @@ public class PacketDigest {
         if (seqNr != 0) throw new RuntimeException("sequence number invalid");
         if (openFiles.get(transmissionId) != null) throw new RuntimeException("no such open file");
 
-        File f = new File(dropoffFolder, Arrays.toString(info.getFileName()));
+        File f = new File(dropoffFolder, new String(info.getFileName()));
 
         f.delete();
         FileOutputStream os = new FileOutputStream(f);
