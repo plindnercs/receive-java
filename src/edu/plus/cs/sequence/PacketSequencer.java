@@ -1,4 +1,4 @@
-package edu.plus.cs.packet.sequence;
+package edu.plus.cs.sequence;
 
 import edu.plus.cs.packet.Packet;
 

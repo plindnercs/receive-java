@@ -1,7 +1,7 @@
 package edu.plus.cs;
 
 import edu.plus.cs.packet.*;
-import edu.plus.cs.packet.sequence.PacketSequencer;
+import edu.plus.cs.sequence.PacketSequencer;
 import edu.plus.cs.packet.util.PacketInterpreter;
 
 import java.io.File;
