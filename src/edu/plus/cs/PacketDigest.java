@@ -1,15 +1,14 @@
 package edu.plus.cs;
 
-import edu.plus.cs.packet.DataPacketBody;
-import edu.plus.cs.packet.FinalizePacketBody;
-import edu.plus.cs.packet.InitializePacketBody;
+import edu.plus.cs.packet.DataPacket;
+import edu.plus.cs.packet.FinalizePacket;
+import edu.plus.cs.packet.InitializePacket;
 import edu.plus.cs.packet.Packet;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
-import java.util.Arrays;
 import java.util.HashMap;
 
 public class PacketDigest {
@@ -21,25 +20,25 @@ public class PacketDigest {
     }
 
     public boolean continueSequence(int transmissionId, Packet packet) {
-        if (packet.getPacketBody() instanceof InitializePacketBody) {
+        if (packet instanceof InitializePacket) {
             try {
-                return handleInfoPacket(transmissionId, packet.getSequenceNumber(), (InitializePacketBody) packet.getPacketBody());
+                return handleInfoPacket(transmissionId, packet.getSequenceNumber(), ((InitializePacket) packet));
             } catch (FileNotFoundException e) {
                 throw new RuntimeException(e);
             }
-        } else if (packet.getPacketBody() instanceof DataPacketBody) {
-            return handleDataPacket(transmissionId, packet.getSequenceNumber(), (DataPacketBody) packet.getPacketBody());
-        } else if (packet.getPacketBody() instanceof FinalizePacketBody) {
-            return handleFinalizePacket(transmissionId, packet.getSequenceNumber(), (FinalizePacketBody) packet.getPacketBody());
+        } else if (packet instanceof DataPacket) {
+            return handleDataPacket(transmissionId, packet.getSequenceNumber(), (DataPacket) packet);
+        } else if (packet instanceof FinalizePacket) {
+            return handleFinalizePacket(transmissionId, packet.getSequenceNumber(), (FinalizePacket) packet);
         }
         return false;
     }
 
-    private boolean handleInfoPacket(int transmissionId, long seqNr, InitializePacketBody info) throws FileNotFoundException {
+    private boolean handleInfoPacket(int transmissionId, long seqNr, InitializePacket initializePacket) throws FileNotFoundException {
         if (seqNr != 0) throw new RuntimeException("sequence number invalid");
         if (openFiles.get(transmissionId) != null) throw new RuntimeException("no such open file");
 
-        File f = new File(dropoffFolder, new String(info.getFileName()));
+        File f = new File(dropoffFolder, new String(initializePacket.getFileName()));
 
         f.delete();
         FileOutputStream os = new FileOutputStream(f);
@@ -49,14 +48,14 @@ public class PacketDigest {
         return true;
     }
 
-    private boolean handleDataPacket(int transmissionId, long sequenceNumber, DataPacketBody data) {
+    private boolean handleDataPacket(int transmissionId, long sequenceNumber, DataPacket dataPacket) {
         FileReference fileReference = openFiles.get(transmissionId);
         if (fileReference == null) throw new RuntimeException("no such open file");
 
         OutputStream os = fileReference.getOutputStream();
 
         try {
-            os.write(data.getData());
+            os.write(dataPacket.getData());
         } catch (Exception e) {
             e.printStackTrace();
             return false;
@@ -65,7 +64,7 @@ public class PacketDigest {
         return true;
     }
 
-    private boolean handleFinalizePacket(int transmissionId, long sequenceNumber, FinalizePacketBody fin) {
+    private boolean handleFinalizePacket(int transmissionId, long sequenceNumber, FinalizePacket finalizePacket) {
         FileReference fileReference = openFiles.get(transmissionId);
         if (fileReference == null) throw new RuntimeException("no such open file");
 

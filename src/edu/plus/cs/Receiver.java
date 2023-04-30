@@ -1,19 +1,19 @@
 package edu.plus.cs;
 
-import edu.plus.cs.packet.DataPacketBody;
-import edu.plus.cs.packet.FinalizePacketBody;
-import edu.plus.cs.packet.InitializePacketBody;
-import edu.plus.cs.packet.Packet;
+import edu.plus.cs.packet.*;
+import edu.plus.cs.packet.sequence.PacketSequencer;
+import edu.plus.cs.packet.util.PacketInterpreter;
 
 import java.io.File;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
-import java.net.InetAddress;
+import java.util.HashMap;
 
 public class Receiver {
     private DatagramSocket socket;
     private PacketDigest digest;
     private PacketSequencer sequencer;
+    private HashMap<Short, Integer> transmissions = new HashMap<>();
 
     public Receiver(File dropOffFolder, int port) {
         digest = new PacketDigest(dropOffFolder);
@@ -30,28 +30,53 @@ public class Receiver {
         byte[] buffer = new byte[65527];
         while (true) {
             DatagramPacket udpPacket = new DatagramPacket(buffer, buffer.length);
+
             try {
                 socket.receive(udpPacket);
-                Packet packet = new Packet(udpPacket.getData(), udpPacket.getLength());
-                if (packet.getSequenceNumber() % 1 == 0 || !(packet.getPacketBody() instanceof DataPacketBody)) {
-                    System.out.println("Received Packet " + packet);
+
+                Packet packet;
+                int maxSequenceNumber;
+                int sequenceNumber = PacketInterpreter.getSequenceNumber(udpPacket.getData());
+                short transmissionId = PacketInterpreter.getTransmissionId(udpPacket.getData());
+
+                if (PacketInterpreter.isInitializationPacket(udpPacket)) {
+                    packet = new InitializePacket(udpPacket.getData(), udpPacket.getLength());
+
+                    maxSequenceNumber = ((InitializePacket) packet).getMaxSequenceNumber();
+
+                    transmissions.put(transmissionId, maxSequenceNumber);
+
+                    System.out.println("Received initialization packet at: " + System.currentTimeMillis());
+                } else {
+                    // no initialization packet seen before for this transmissionId -> abort transmission
+                    if (!transmissions.containsKey(transmissionId)) {
+                        System.err.println("Did not receive initialization packet before, abort transmission");
+                        break;
+                    }
+
+                    // check for finalize or data packet
+                    if (sequenceNumber == (transmissions.get(transmissionId) + 1)) {
+                        packet = new FinalizePacket(udpPacket.getData(), udpPacket.getLength());
+
+                        System.out.println("Received finalize packet at: " + System.currentTimeMillis());
+                    } else {
+                        packet = new DataPacket(udpPacket.getData(), udpPacket.getLength());
+                    }
                 }
-                if (packet.getPacketBody() instanceof InitializePacketBody) {
-                    System.out.println("rec inf at " + System.currentTimeMillis());
-                } else if (packet.getPacketBody() instanceof FinalizePacketBody) {
-                    System.out.println("rec fin at " + System.currentTimeMillis());
-                }
-                int transmissionId = transmissionId(packet.getTransmissionId(), udpPacket.getAddress(), udpPacket.getPort());
+
+                printPacket(packet);
+
                 sequencer.push(packet, transmissionId);
             } catch (Exception e) {
                 System.err.println(e);
-                System.out.println("Discarded Packet with content [" +
+                System.out.println("Discarded packet with content [" +
                         new String(udpPacket.getData(), 0, udpPacket.getLength()) + "]");
             }
         }
     }
 
-    private int transmissionId(short uid, InetAddress receiverAddress, int receiverPort) {
-        return uid + receiverAddress.hashCode() + Integer.valueOf(receiverPort).hashCode();
+    private void printPacket(Packet packet) {
+        System.out.println("Received packet: ");
+        System.out.println(packet);
     }
 }

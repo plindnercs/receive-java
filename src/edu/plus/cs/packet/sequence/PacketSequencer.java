@@ -1,10 +1,10 @@
-package edu.plus.cs;
+package edu.plus.cs.packet.sequence;
 
 import edu.plus.cs.packet.Packet;
 
+import java.util.Comparator;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,12 +15,6 @@ public class PacketSequencer {
     private int maxCachedPacketsPerSequence;
     private BiFunction<Integer, Packet, Boolean> continueSequence;
     private Consumer<Integer> cancelSequence;
-
-    private class OpenPacketSequence {
-        public long openedAt = System.currentTimeMillis();
-        public List<Packet> cachedPackets = new ArrayList<>();
-        public int nextSeqNr = 0;
-    }
 
     private Map<Integer, OpenPacketSequence> openSequences = new HashMap<>();
 
@@ -36,7 +30,7 @@ public class PacketSequencer {
         try {
             OpenPacketSequence sequence = openSequences.computeIfAbsent(transmissionId, k -> new OpenPacketSequence());
 
-            if (packet.getSequenceNumber() != sequence.nextSeqNr) {
+            if (packet.getSequenceNumber() != sequence.nextSequenceNumber) {
                 sequence.cachedPackets.add(packet);
 
                 if (sequence.cachedPackets.size() > maxCachedPacketsPerSequence) {
@@ -48,13 +42,13 @@ public class PacketSequencer {
                 if (!continueSequence) {
                     openSequences.remove(transmissionId);
                 } else {
-                    sequence.nextSeqNr++;
+                    sequence.nextSequenceNumber++;
 
                     List<Packet> cache = sequence.cachedPackets;
                     if (cache.size() > 0) {
-                        cache.sort((p1, p2) -> Integer.compare(p1.getSequenceNumber(), p2.getSequenceNumber()));
+                        cache.sort(Comparator.comparingInt(Packet::getSequenceNumber));
 
-                        while (cache.size() > 0 && cache.get(0).getSequenceNumber() == sequence.nextSeqNr) {
+                        while (cache.size() > 0 && cache.get(0).getSequenceNumber() == sequence.nextSequenceNumber) {
                             Packet nextPacket = cache.remove(0);
                             boolean continueSequenceNow = this.continueSequence.apply(transmissionId, nextPacket);
 
@@ -62,7 +56,7 @@ public class PacketSequencer {
                                 cache.clear();
                                 openSequences.remove(transmissionId);
                             } else {
-                                sequence.nextSeqNr++;
+                                sequence.nextSequenceNumber++;
                             }
                         }
                     }
@@ -73,7 +67,7 @@ public class PacketSequencer {
         }
 
         while (openSequences.size() > maxOpenSequences) {
-            openSequences.remove(openSequences.entrySet().stream().min((e1, e2) -> Long.compare(e1.getValue().openedAt, e2.getValue().openedAt)).get().getKey());
+            openSequences.remove(openSequences.entrySet().stream().min(Comparator.comparingLong(e -> e.getValue().openedAt)).get().getKey());
         }
     }
 }
