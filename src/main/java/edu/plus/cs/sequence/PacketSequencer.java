@@ -30,28 +30,40 @@ public class PacketSequencer {
         try {
             OpenPacketSequence sequence = openSequences.computeIfAbsent(transmissionId, k -> new OpenPacketSequence());
 
+            // check if packet did not arrive in expected (correct) order
             if (packet.getSequenceNumber() != sequence.nextSequenceNumber) {
+                // add it to the cache to process it later on
                 sequence.cachedPackets.add(packet);
 
+                // check if there are too many cached packets already
                 if (sequence.cachedPackets.size() > maxCachedPacketsPerSequence) {
+                    // remove it from the open sequences
                     openSequences.remove(transmissionId);
+
+                    // removes entry from openFiles in PacketDigest
                     cancelSequence.accept(transmissionId);
                 }
             } else {
+                // handles packet via PacketDigest and decides if the transmit sequence will be continued
                 boolean continueSequence = this.continueSequence.apply(transmissionId, packet);
+
                 if (!continueSequence) {
+                    // done with processing this sequence, remove it from the open sequences
                     openSequences.remove(transmissionId);
                 } else {
                     sequence.nextSequenceNumber++;
 
                     List<Packet> cache = sequence.cachedPackets;
+                    // check if there are some packets which were received in a wrong order
                     if (cache.size() > 0) {
+                        // keep correct order of the incoming packets
                         cache.sort(Comparator.comparingInt(Packet::getSequenceNumber));
 
                         while (cache.size() > 0 && cache.get(0).getSequenceNumber() == sequence.nextSequenceNumber) {
                             Packet nextPacket = cache.remove(0);
                             boolean continueSequenceNow = this.continueSequence.apply(transmissionId, nextPacket);
 
+                            // done with processing this sequence, remove it from the open sequences & clear cache
                             if (!continueSequenceNow) {
                                 cache.clear();
                                 openSequences.remove(transmissionId);
@@ -63,9 +75,11 @@ public class PacketSequencer {
                 }
             }
         } catch (Exception e) {
+            // removes entry from openFiles in PacketDigest
             cancelSequence.accept(transmissionId);
         }
 
+        // if maximum of open sequences is reached, remove the oldest ones
         while (openSequences.size() > maxOpenSequences) {
             openSequences.remove(openSequences.entrySet().stream().min(Comparator.comparingLong(e -> e.getValue().openedAt)).get().getKey());
         }
