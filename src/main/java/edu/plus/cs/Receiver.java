@@ -27,7 +27,7 @@ public class Receiver {
     }
 
     public void start() {
-        byte[] buffer = new byte[65527];
+        byte[] buffer = new byte[65535];
         while (true) {
             DatagramPacket udpPacket = new DatagramPacket(buffer, buffer.length);
 
@@ -64,7 +64,7 @@ public class Receiver {
                     }
                 }
 
-                printPacket(packet);
+                // printPacket(packet);
 
                 sequencer.push(packet, transmissionId);
             } catch (Exception e) {

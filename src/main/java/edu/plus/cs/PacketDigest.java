@@ -14,35 +14,35 @@ import java.util.Arrays;
 import java.util.HashMap;
 
 public class PacketDigest {
-    private final File dropoffFolder;
+    private final File targetFolder;
     private final HashMap<Integer, FileReference> openFiles = new HashMap<>();
 
-    public PacketDigest(File dropoffFolder) {
-        this.dropoffFolder = dropoffFolder;
+    public PacketDigest(File targetFolder) {
+        this.targetFolder = targetFolder;
     }
 
     public boolean continueSequence(int transmissionId, Packet packet) {
         if (packet instanceof InitializePacket) {
             try {
-                return handleInfoPacket(transmissionId, packet.getSequenceNumber(), ((InitializePacket) packet));
+                return handleInitializePacket(transmissionId, packet.getSequenceNumber(), ((InitializePacket) packet));
             } catch (FileNotFoundException e) {
                 throw new RuntimeException(e);
             }
         } else if (packet instanceof DataPacket) {
-            return handleDataPacket(transmissionId, packet.getSequenceNumber(), (DataPacket) packet);
+            return handleDataPacket(transmissionId, (DataPacket) packet);
         } else if (packet instanceof FinalizePacket) {
             return handleFinalizePacket(transmissionId, (FinalizePacket) packet);
         }
         return false;
     }
 
-    private boolean handleInfoPacket(int transmissionId, long seqNr, InitializePacket initializePacket) throws FileNotFoundException {
-        if (seqNr != 0) throw new RuntimeException("sequence number invalid");
-        if (openFiles.get(transmissionId) != null) throw new RuntimeException("no such open file");
+    private boolean handleInitializePacket(int transmissionId, int sequenceNumber, InitializePacket initializePacket) throws FileNotFoundException {
+        if (sequenceNumber != 0) throw new RuntimeException("Sequence number invalid");
+        if (openFiles.get(transmissionId) != null) throw new RuntimeException("No such open file");
 
-        File f = new File(dropoffFolder, new String(initializePacket.getFileName()));
-
+        File f = new File(targetFolder, new String(initializePacket.getFileName()));
         f.delete();
+
         FileOutputStream os = new FileOutputStream(f);
 
         openFiles.put(transmissionId, new FileReference(f, os));
@@ -50,7 +50,7 @@ public class PacketDigest {
         return true;
     }
 
-    private boolean handleDataPacket(int transmissionId, long sequenceNumber, DataPacket dataPacket) {
+    private boolean handleDataPacket(int transmissionId, DataPacket dataPacket) {
         FileReference fileReference = openFiles.get(transmissionId);
         if (fileReference == null) throw new RuntimeException("no such open file");
 
@@ -77,7 +77,7 @@ public class PacketDigest {
             byte[] hashActual = MessageDigest.getInstance("MD5").digest(Files.readAllBytes(fileReference.getFile().toPath()));
 
             if (Arrays.equals(hashShould, hashActual)) {
-                System.out.println("File successfully transferred");
+                System.out.println("File " + fileReference.getFile().getName() + " successfully transferred");
                 try {
                     os.flush();
                     os.close();
@@ -85,13 +85,15 @@ public class PacketDigest {
                     e.printStackTrace();
                 }
             } else {
-                System.out.println("Hashes do not match! Keeping corrupted file anyway!");
+                System.err.println("Hashes are not equal");
                 System.out.println("Should: " + String.format("%032x", new BigInteger(1, hashShould)));
                 System.out.println("Actual: " + String.format("%032x", new BigInteger(1, hashActual)));
             }
         } catch (IOException | NoSuchAlgorithmException ex) {
             ex.printStackTrace();
         }
+
+        openFiles.remove(transmissionId);
 
         return false;
     }
