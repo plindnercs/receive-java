@@ -2,13 +2,8 @@ package edu.plus.cs.packet;
 
 import edu.plus.cs.packet.util.PacketInterpreter;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 
 public abstract class Packet implements Serializable {
     short transmissionId; // 16 bit

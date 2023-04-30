@@ -8,6 +8,11 @@ import java.util.Arrays;
 public class DataPacket extends Packet {
     byte[] data;
 
+    public DataPacket(short transmissionId, int sequenceNumber, byte[] data) {
+        super(transmissionId, sequenceNumber);
+        this.data = data;
+    }
+
     public DataPacket(byte[] data, int len) {
         super(data);
         this.data = PacketInterpreter.getByteArrayAt(data, HEADER_SIZE, len - HEADER_SIZE);
@@ -20,7 +25,7 @@ public class DataPacket extends Packet {
     @Override
     public byte[] serialize() {
         byte[] header = super.serialize();
-        ByteBuffer byteBuffer = ByteBuffer.allocate(1 + data.length);
+        ByteBuffer byteBuffer = ByteBuffer.allocate(HEADER_SIZE + data.length);
         byteBuffer.put(header);
         byteBuffer.put(data);
         return byteBuffer.array();

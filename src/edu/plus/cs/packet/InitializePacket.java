@@ -10,6 +10,12 @@ public class InitializePacket extends Packet {
     int maxSequenceNumber; // 32 bit
     char[] fileName; // [0 ... 2048] bit
 
+    public InitializePacket(short transmissionId, int sequenceNumber, int maxSequenceNumber, char[] fileName) {
+        super(transmissionId, sequenceNumber);
+        this.maxSequenceNumber = maxSequenceNumber;
+        this.fileName = fileName;
+    }
+
     public InitializePacket(byte[] data, int len) {
         super(data);
         this.maxSequenceNumber = PacketInterpreter.getUIntAt(data, HEADER_SIZE);

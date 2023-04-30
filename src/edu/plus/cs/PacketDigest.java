@@ -5,10 +5,12 @@ import edu.plus.cs.packet.FinalizePacket;
 import edu.plus.cs.packet.InitializePacket;
 import edu.plus.cs.packet.Packet;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.OutputStream;
+import java.io.*;
+import java.math.BigInteger;
+import java.nio.file.Files;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.HashMap;
 
 public class PacketDigest {
@@ -29,7 +31,7 @@ public class PacketDigest {
         } else if (packet instanceof DataPacket) {
             return handleDataPacket(transmissionId, packet.getSequenceNumber(), (DataPacket) packet);
         } else if (packet instanceof FinalizePacket) {
-            return handleFinalizePacket(transmissionId, packet.getSequenceNumber(), (FinalizePacket) packet);
+            return handleFinalizePacket(transmissionId, (FinalizePacket) packet);
         }
         return false;
     }
@@ -64,34 +66,37 @@ public class PacketDigest {
         return true;
     }
 
-    private boolean handleFinalizePacket(int transmissionId, long sequenceNumber, FinalizePacket finalizePacket) {
+    private boolean handleFinalizePacket(int transmissionId, FinalizePacket finalizePacket) {
         FileReference fileReference = openFiles.get(transmissionId);
         if (fileReference == null) throw new RuntimeException("no such open file");
 
         OutputStream os = fileReference.getOutputStream();
 
-        /*byte[] hashShould = fin.getMurmurHash3();
-        byte[] hashActual = h.finish().asBigEndianByteArray();*/
+        try {
+            byte[] hashShould = finalizePacket.getMd5();
+            byte[] hashActual = MessageDigest.getInstance("MD5").digest(Files.readAllBytes(fileReference.getFile().toPath()));
 
-        if (true/*hashShould.equals(hashActual)*/) {
-            System.out.println("File successfully transferred");
-            try {
-                os.flush();
-                os.close();
-            } catch (Exception e) {
-                e.printStackTrace();
+            if (Arrays.equals(hashShould, hashActual)) {
+                System.out.println("File successfully transferred");
+                try {
+                    os.flush();
+                    os.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            } else {
+                System.out.println("Hashes do not match! Keeping corrupted file anyway!");
+                System.out.println("Should: " + String.format("%032x", new BigInteger(1, hashShould)));
+                System.out.println("Actual: " + String.format("%032x", new BigInteger(1, hashActual)));
             }
-        } else {
-            System.out.println("Hashes do not match! Keeping corrupted file anyway!");
-            /*System.out.printf("Should: %d %d%n", hashShould[0], hashShould[1]);
-            System.out.printf("Actual: %d %d%n", hashActual[0], hashActual[1]);*/
+        } catch (IOException | NoSuchAlgorithmException ex) {
+            ex.printStackTrace();
         }
 
         return false;
     }
 
     public void cancelSequence(int transmissionId) {
-        FileReference fileReference = openFiles.remove(transmissionId);
-        if (fileReference == null) return;
+        openFiles.remove(transmissionId);
     }
 }
