@@ -13,25 +13,27 @@ public class PacketSequencer {
 
     private int maxOpenSequences;
     private int maxCachedPacketsPerSequence;
-    private BiFunction<Integer, Packet, Boolean> continueSequence;
-    private Consumer<Integer> cancelSequence;
+    private BiFunction<Short, Packet, Boolean> continueSequence;
+    private Consumer<Short> cancelSequence;
 
-    private Map<Integer, OpenPacketSequence> openSequences = new HashMap<>();
+    private Map<Short, OpenPacketSequence> openSequences = new HashMap<>();
 
     public PacketSequencer(int maxOpenSequences, int maxCachedPacketsPerSequence,
-                           BiFunction<Integer, Packet, Boolean> continueSequence, Consumer<Integer> cancelSequence) {
+                           BiFunction<Short, Packet, Boolean> continueSequence, Consumer<Short> cancelSequence) {
         this.maxOpenSequences = maxOpenSequences;
         this.maxCachedPacketsPerSequence = maxCachedPacketsPerSequence;
         this.continueSequence = continueSequence;
         this.cancelSequence = cancelSequence;
     }
 
-    public void push(Packet packet, int transmissionId) {
+    public void push(Packet packet, short transmissionId) {
         try {
             OpenPacketSequence sequence = openSequences.computeIfAbsent(transmissionId, k -> new OpenPacketSequence());
 
             // check if packet did not arrive in expected (correct) order
             if (packet.getSequenceNumber() != sequence.nextSequenceNumber) {
+                System.err.println("Expected packet with sequence number '" + sequence.nextSequenceNumber
+                        + "' but got packet with sequence number '" + packet.getSequenceNumber() + "'");
                 // add it to the cache to process it later on
                 sequence.cachedPackets.add(packet);
 

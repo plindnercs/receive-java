@@ -15,13 +15,13 @@ import java.util.HashMap;
 
 public class PacketDigest {
     private final File targetFolder;
-    private final HashMap<Integer, FileReference> openFiles = new HashMap<>();
+    private final HashMap<Short, FileReference> openFiles = new HashMap<>();
 
     public PacketDigest(File targetFolder) {
         this.targetFolder = targetFolder;
     }
 
-    public boolean continueSequence(int transmissionId, Packet packet) {
+    public boolean continueSequence(short transmissionId, Packet packet) {
         if (packet instanceof InitializePacket) {
             try {
                 return handleInitializePacket(transmissionId, packet.getSequenceNumber(), ((InitializePacket) packet));
@@ -36,7 +36,7 @@ public class PacketDigest {
         return false;
     }
 
-    private boolean handleInitializePacket(int transmissionId, int sequenceNumber, InitializePacket initializePacket) throws FileNotFoundException {
+    private boolean handleInitializePacket(short transmissionId, int sequenceNumber, InitializePacket initializePacket) throws FileNotFoundException {
         if (sequenceNumber != 0) throw new RuntimeException("Sequence number invalid");
         if (openFiles.get(transmissionId) != null) throw new RuntimeException("No such open file");
 
@@ -50,7 +50,7 @@ public class PacketDigest {
         return true;
     }
 
-    private boolean handleDataPacket(int transmissionId, DataPacket dataPacket) {
+    private boolean handleDataPacket(short transmissionId, DataPacket dataPacket) {
         FileReference fileReference = openFiles.get(transmissionId);
         if (fileReference == null) throw new RuntimeException("no such open file");
 
@@ -66,7 +66,7 @@ public class PacketDigest {
         return true;
     }
 
-    private boolean handleFinalizePacket(int transmissionId, FinalizePacket finalizePacket) {
+    private boolean handleFinalizePacket(short transmissionId, FinalizePacket finalizePacket) {
         FileReference fileReference = openFiles.get(transmissionId);
         if (fileReference == null) throw new RuntimeException("no such open file");
 
