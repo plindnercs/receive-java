@@ -15,7 +15,10 @@ public class Receiver {
     private PacketSequencer sequencer;
     private HashMap<Short, Integer> transmissions = new HashMap<>();
 
-    public Receiver(File dropOffFolder, int port) {
+    private short transmissionId;
+
+    public Receiver(short transmissionId, int port, File dropOffFolder) {
+        this.transmissionId = transmissionId;
         digest = new PacketDigest(dropOffFolder);
         sequencer = new PacketSequencer(128, 1024, digest::continueSequence, digest::cancelSequence);
         try {

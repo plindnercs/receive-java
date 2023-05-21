@@ -4,20 +4,21 @@ import java.io.File;
 
 public class Main {
     public static void main(String[] args) {
-        if (args.length != 2) {
-            System.err.println("Usage: <targetFolder> <port>");
+        if (args.length != 3) {
+            System.err.println("Usage: <transmissionId> <port> <targetFolder>");
             return;
         }
 
-        File targetFolder = new File(args[0]);
+        short transmissionId = Short.parseShort(args[0]);
+        int port = Integer.parseInt(args[1]);
+
+        File targetFolder = new File(args[2]);
         if (targetFolder.exists() && !targetFolder.isDirectory()) {
             System.err.println("Target folder can't be a file");
             return;
         }
         targetFolder.mkdirs();
 
-        int port = Integer.parseInt(args[1]);
-
-        new Receiver(targetFolder, port).start();
+        new Receiver(transmissionId, port, targetFolder).start();
     }
 }
