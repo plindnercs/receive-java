@@ -97,8 +97,4 @@ public class PacketDigest {
 
         return false;
     }
-
-    public void cancelSequence(int transmissionId) {
-        openFiles.remove(transmissionId);
-    }
 }
