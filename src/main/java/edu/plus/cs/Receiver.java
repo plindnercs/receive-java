@@ -1,7 +1,6 @@
 package edu.plus.cs;
 
 import edu.plus.cs.packet.*;
-import edu.plus.cs.sequence.PacketSequencer;
 import edu.plus.cs.packet.util.PacketInterpreter;
 
 import java.io.File;
@@ -12,15 +11,12 @@ import java.util.HashMap;
 public class Receiver {
     private DatagramSocket socket;
     private PacketDigest digest;
-    private PacketSequencer sequencer;
     private HashMap<Short, Integer> transmissions = new HashMap<>();
-
     private short transmissionId;
 
     public Receiver(short transmissionId, int port, File dropOffFolder) {
         this.transmissionId = transmissionId;
         digest = new PacketDigest(dropOffFolder);
-        sequencer = new PacketSequencer(128, 1024, digest::continueSequence, digest::cancelSequence);
         try {
             socket = new DatagramSocket(port);
             socket.setBroadcast(true);
@@ -41,6 +37,11 @@ public class Receiver {
                 int maxSequenceNumber;
                 int sequenceNumber = PacketInterpreter.getSequenceNumber(udpPacket.getData());
                 short transmissionId = PacketInterpreter.getTransmissionId(udpPacket.getData());
+
+                if (this.transmissionId != transmissionId) {
+                    System.err.println("Received packet with wrong transmissionId, abort transmission");
+                    break;
+                }
 
                 if (PacketInterpreter.isInitializationPacket(udpPacket)) {
                     packet = new InitializePacket(udpPacket.getData(), udpPacket.getLength());
@@ -69,7 +70,7 @@ public class Receiver {
 
                 // printPacket(packet);
 
-                sequencer.push(packet, transmissionId);
+                digest.handlePacket(transmissionId, packet);
             } catch (Exception e) {
                 System.err.println(e);
                 System.out.println("Discarded packet with content [" +

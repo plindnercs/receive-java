@@ -21,7 +21,7 @@ public class PacketDigest {
         this.targetFolder = targetFolder;
     }
 
-    public boolean continueSequence(short transmissionId, Packet packet) {
+    public boolean handlePacket(short transmissionId, Packet packet) {
         if (packet instanceof InitializePacket) {
             try {
                 return handleInitializePacket(transmissionId, packet.getSequenceNumber(), ((InitializePacket) packet));
