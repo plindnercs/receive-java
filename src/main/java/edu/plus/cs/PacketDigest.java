@@ -1,12 +1,11 @@
 package edu.plus.cs;
 
-import edu.plus.cs.packet.DataPacket;
-import edu.plus.cs.packet.FinalizePacket;
-import edu.plus.cs.packet.InitializePacket;
-import edu.plus.cs.packet.Packet;
+import edu.plus.cs.packet.*;
 
 import java.io.*;
 import java.math.BigInteger;
+import java.net.DatagramPacket;
+import java.net.InetAddress;
 import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -16,6 +15,7 @@ import java.util.HashMap;
 public class PacketDigest {
     private final File targetFolder;
     private final HashMap<Short, FileReference> openFiles = new HashMap<>();
+
 
     public PacketDigest(File targetFolder) {
         this.targetFolder = targetFolder;
@@ -33,6 +33,7 @@ public class PacketDigest {
         } else if (packet instanceof FinalizePacket) {
             return handleFinalizePacket(transmissionId, (FinalizePacket) packet);
         }
+
         return false;
     }
 
@@ -95,6 +96,6 @@ public class PacketDigest {
 
         openFiles.remove(transmissionId);
 
-        return false;
+        return true;
     }
 }

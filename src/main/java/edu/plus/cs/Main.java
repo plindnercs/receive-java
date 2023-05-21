@@ -1,11 +1,13 @@
 package edu.plus.cs;
 
 import java.io.File;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
 public class Main {
-    public static void main(String[] args) {
-        if (args.length != 3) {
-            System.err.println("Usage: <transmissionId> <port> <targetFolder>");
+    public static void main(String[] args) throws UnknownHostException {
+        if (args.length != 5) {
+            System.err.println("Usage: <transmissionId> <port> <targetFolder> <ackIp> <ackPort>");
             return;
         }
 
@@ -19,6 +21,9 @@ public class Main {
         }
         targetFolder.mkdirs();
 
-        new Receiver(transmissionId, port, targetFolder).start();
+        String ackIp = args[3];
+        int ackPort = Integer.parseInt(args[4]);
+
+        new Receiver(transmissionId, port, targetFolder, InetAddress.getByName(ackIp), ackPort).start();
     }
 }

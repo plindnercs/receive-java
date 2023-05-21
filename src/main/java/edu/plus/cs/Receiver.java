@@ -4,8 +4,10 @@ import edu.plus.cs.packet.*;
 import edu.plus.cs.packet.util.PacketInterpreter;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.util.HashMap;
 
 public class Receiver {
@@ -13,8 +15,10 @@ public class Receiver {
     private PacketDigest digest;
     private HashMap<Short, Integer> transmissions = new HashMap<>();
     private short transmissionId;
+    InetAddress ackIp;
+    int ackPort;
 
-    public Receiver(short transmissionId, int port, File dropOffFolder) {
+    public Receiver(short transmissionId, int port, File dropOffFolder, InetAddress ackIp, int ackPort) {
         this.transmissionId = transmissionId;
         digest = new PacketDigest(dropOffFolder);
         try {
@@ -23,6 +27,8 @@ public class Receiver {
         } catch (Exception e) {
             e.printStackTrace();
         }
+        this.ackIp = ackIp;
+        this.ackPort = ackPort;
     }
 
     public void start() {
@@ -70,13 +76,26 @@ public class Receiver {
 
                 // printPacket(packet);
 
-                digest.handlePacket(transmissionId, packet);
+                if (digest.handlePacket(transmissionId, packet)) {
+                    sendAcknowledgementPacket(transmissionId, packet.getSequenceNumber());
+                } else {
+                    System.err.println("Error while handling packet: " + packet);
+                }
             } catch (Exception e) {
                 System.err.println(e);
                 System.out.println("Discarded packet with content [" +
                         new String(udpPacket.getData(), 0, udpPacket.getLength()) + "]");
             }
         }
+    }
+
+    private void sendAcknowledgementPacket(short transmissionId, int sequenceNumber) throws IOException {
+        AcknowledgementPacket ackPacket = new AcknowledgementPacket(transmissionId, sequenceNumber);
+
+        byte[] bytes = ackPacket.serialize();
+
+        DatagramPacket udpPacket = new DatagramPacket(bytes, bytes.length, this.ackIp, this.ackPort);
+        this.socket.send(udpPacket);
     }
 
     private void printPacket(Packet packet) {
