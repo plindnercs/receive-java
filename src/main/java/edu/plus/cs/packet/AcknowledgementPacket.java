@@ -13,4 +13,12 @@ public class AcknowledgementPacket extends Packet {
     public byte[] serialize() {
         return super.serialize();
     }
+
+    @Override
+    public String toString() {
+        return "AcknowledgementPacket{" +
+                "transmissionId=" + transmissionId +
+                ", sequenceNumber=" + sequenceNumber +
+                '}';
+    }
 }
