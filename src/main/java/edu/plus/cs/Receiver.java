@@ -2,6 +2,7 @@ package edu.plus.cs;
 
 import edu.plus.cs.packet.*;
 import edu.plus.cs.packet.util.PacketInterpreter;
+import edu.plus.cs.util.OperatingMode;
 
 import java.io.File;
 import java.io.IOException;
@@ -15,10 +16,12 @@ public class Receiver {
     private PacketDigest digest;
     private HashMap<Short, Integer> transmissions = new HashMap<>();
     private short transmissionId;
-    InetAddress ackIp;
-    int ackPort;
+    private InetAddress ackIp;
+    private int ackPort;
+    private OperatingMode operatingMode;
 
-    public Receiver(short transmissionId, int port, File dropOffFolder, InetAddress ackIp, int ackPort) {
+    public Receiver(short transmissionId, int port, File dropOffFolder, InetAddress ackIp, int ackPort,
+                    OperatingMode operatingMode) {
         this.transmissionId = transmissionId;
         digest = new PacketDigest(dropOffFolder);
         try {
@@ -29,6 +32,7 @@ public class Receiver {
         }
         this.ackIp = ackIp;
         this.ackPort = ackPort;
+        this.operatingMode = operatingMode;
     }
 
     public void start() {
@@ -77,7 +81,10 @@ public class Receiver {
                 // printPacket(packet);
 
                 if (digest.handlePacket(transmissionId, packet)) {
-                    sendAcknowledgementPacket(transmissionId, packet.getSequenceNumber());
+                    // only send acknowledgement if the operating mode requires to
+                    if (operatingMode == OperatingMode.STOP_WAIT) {
+                        sendAcknowledgementPacket(transmissionId, packet.getSequenceNumber());
+                    }
                 } else {
                     System.err.println("Error while handling packet: " + packet);
                 }
