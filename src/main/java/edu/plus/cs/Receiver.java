@@ -147,16 +147,6 @@ public class Receiver {
                     }
                 }
 
-                windowBuffer.add(packet);
-
-                if (packet.getSequenceNumber() != expectedPacket) {
-                    System.out.println("Expected packet: " + expectedPacket + " but got Packet: " +
-                            packet.getSequenceNumber());
-                    missingPackets.push(expectedPacket);
-
-                    expectedPacket++;
-                }
-
                 // printPacket(packet);
 
                 // process single packet
@@ -170,6 +160,16 @@ public class Receiver {
                         System.err.println("Error while handling packet: " + packet);
                     }
                 } else {
+                    windowBuffer.add(packet);
+
+                    if (packet.getSequenceNumber() != expectedPacket) {
+                        System.out.println("Expected packet: " + expectedPacket + " but got Packet: " +
+                                packet.getSequenceNumber());
+                        missingPackets.push(expectedPacket);
+
+                        expectedPacket++;
+                    }
+
                     if (!retryMode) {
                         // we are still in correct order
                         expectedPacket++;
