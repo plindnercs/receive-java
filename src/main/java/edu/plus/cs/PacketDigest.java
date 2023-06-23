@@ -72,10 +72,10 @@ public class PacketDigest {
 
         try {
             byte[] hashShould = finalizePacket.getMd5();
-            byte[] hashActual = MessageDigest.getInstance("MD5").digest(Files.readAllBytes(fileReference.getFile().toPath()));
+            byte[] hashActual = MessageDigest.getInstance("MD5")
+                    .digest(Files.readAllBytes(fileReference.getFile().toPath()));
 
             if (Arrays.equals(hashShould, hashActual)) {
-                System.out.println("File " + fileReference.getFile().getName() + " successfully transferred");
                 try {
                     os.flush();
                     os.close();
@@ -92,6 +92,9 @@ public class PacketDigest {
         }
 
         openFiles.remove(transmissionId);
+
+        System.out.println("Processed finalize packet at: " + System.currentTimeMillis());
+        System.out.println("File " + fileReference.getFile().getName() + " successfully transferred");
 
         return true;
     }

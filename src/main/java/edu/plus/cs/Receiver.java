@@ -26,6 +26,7 @@ public class Receiver {
     private int windowStart = 0;
     private int windowTimeout;
     private int duplicateAckDelay;
+    private int retransmittedPackets = 0;
     private Predicate<List<Packet>> hasFinalizePacket =
             list -> list.stream().anyMatch(packet -> packet instanceof FinalizePacket);
     private BiPredicate<List<Packet>, Integer> hasPacketWithSequenceNumber =
@@ -122,8 +123,6 @@ public class Receiver {
                     // check for finalize or data packet
                     if (sequenceNumber == (transmissions.get(transmissionId) + 1)) {
                         packet = new FinalizePacket(udpPacket.getData(), udpPacket.getLength());
-
-                        System.out.println("Received finalize packet at: " + System.currentTimeMillis());
                     } else {
                         packet = new DataPacket(udpPacket.getData(), udpPacket.getLength());
                     }
@@ -169,8 +168,10 @@ public class Receiver {
         windowStart += windowSize;
 
         if (windowBuffer.stream().anyMatch(packet -> packet instanceof FinalizePacket)) {
+            System.out.println("Number of retransmitted packets: " + retransmittedPackets);
             socket.setSoTimeout(0); // reset timeout since no transmission is active
             windowStart = 0;
+            retransmittedPackets = 0;
         }
 
         windowBuffer.clear();
@@ -201,11 +202,14 @@ public class Receiver {
     }
 
     private void requestMissingPacket(int sequenceNumber) throws IOException, InterruptedException {
-        System.out.println("Requesting lost packet: " + sequenceNumber);
+        // System.out.println("Requesting lost packet: " + sequenceNumber);
 
         sendAcknowledgementPacket(transmissionId, sequenceNumber);
         TimeUnit.MILLISECONDS.sleep(duplicateAckDelay); // delay to avoid flooding the transmitter
         sendAcknowledgementPacket(transmissionId, sequenceNumber);
+        TimeUnit.MILLISECONDS.sleep(duplicateAckDelay); // delay to avoid flooding the transmitter
+
+        retransmittedPackets++;
     }
 
     private void sendAcknowledgementPacket(short transmissionId, int sequenceNumber) throws IOException {
