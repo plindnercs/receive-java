@@ -36,8 +36,10 @@ public class Main {
 
             String ackIp = (operatingMode != OperatingMode.NO_ACK) ? args[4] : null;
             int ackPort = (operatingMode != OperatingMode.NO_ACK) ? Integer.parseInt(args[5]) : -1;
+            int windowSize = (operatingMode == OperatingMode.SLIDING_WINDOW) ? Integer.parseInt(args[6]) : -1;
 
-            new Receiver(transmissionId, port, targetFolder, InetAddress.getByName(ackIp), ackPort, operatingMode).start();
+            new Receiver(transmissionId, port, targetFolder, InetAddress.getByName(ackIp),
+                    ackPort, operatingMode, windowSize).start();
         }
     }
 

@@ -9,7 +9,10 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Stack;
 
 public class Receiver {
     private DatagramSocket socket;
@@ -19,9 +22,12 @@ public class Receiver {
     private InetAddress ackIp;
     private int ackPort;
     private OperatingMode operatingMode;
+    private int windowSize;
+    private List<Packet> windowBuffer;
+    private Stack<Integer> missingPackets;
 
     public Receiver(short transmissionId, int port, File dropOffFolder, InetAddress ackIp, int ackPort,
-                    OperatingMode operatingMode) {
+                    OperatingMode operatingMode, int windowSize) {
         this.transmissionId = transmissionId;
         digest = new PacketDigest(dropOffFolder);
         try {
@@ -33,6 +39,11 @@ public class Receiver {
         this.ackIp = ackIp;
         this.ackPort = ackPort;
         this.operatingMode = operatingMode;
+        this.windowSize = windowSize;
+        if (operatingMode == OperatingMode.SLIDING_WINDOW) {
+            this.windowBuffer = new ArrayList<>();
+            this.missingPackets = new Stack<>();
+        }
     }
 
     public void start() {
