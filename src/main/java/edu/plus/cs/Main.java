@@ -18,9 +18,9 @@ public class Main {
             } else if (operatingMode == OperatingMode.STOP_WAIT && args.length != 6) {
                 System.err.println("Usage: <operatingMode> <transmissionId> <port> <targetFolder> <ackIp> <ackPort>");
                 return;
-            } else if (operatingMode == OperatingMode.SLIDING_WINDOW && args.length != 7) {
+            } else if (operatingMode == OperatingMode.SLIDING_WINDOW && args.length != 9) {
                 System.err.println("Usage: <operatingMode> <transmissionId> <port> <targetFolder> <ackIp> " +
-                        "<ackPort> <windowSize>");
+                        "<ackPort> <windowSize> <windowTimeout> <dupAckDelay>");
                 return;
             }
 
@@ -37,9 +37,11 @@ public class Main {
             String ackIp = (operatingMode != OperatingMode.NO_ACK) ? args[4] : null;
             int ackPort = (operatingMode != OperatingMode.NO_ACK) ? Integer.parseInt(args[5]) : -1;
             int windowSize = (operatingMode == OperatingMode.SLIDING_WINDOW) ? Integer.parseInt(args[6]) : -1;
+            int windowTimeout = (operatingMode == OperatingMode.SLIDING_WINDOW) ? Integer.parseInt(args[7]) : -1;
+            int duplicateAckDelay = (operatingMode == OperatingMode.SLIDING_WINDOW) ? Integer.parseInt(args[8]) : -1;
 
             new Receiver(transmissionId, port, targetFolder, InetAddress.getByName(ackIp),
-                    ackPort, operatingMode, windowSize).start();
+                    ackPort, operatingMode, windowSize, windowTimeout, duplicateAckDelay).start();
         }
     }
 

@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiPredicate;
+import java.util.function.Predicate;
 
 public class Receiver {
     private DatagramSocket socket;
@@ -21,12 +23,17 @@ public class Receiver {
     private int windowSize;
     private List<Packet> windowBuffer;
     private Stack<Integer> missingPackets;
-    private int expectedPacket = 0;
-    private boolean retryMode = false;
     private int windowStart = 0;
+    private int windowTimeout;
+    private int duplicateAckDelay = 0;
+    private Predicate<List<Packet>> hasFinalizePacket =
+            list -> list.stream().anyMatch(packet -> packet instanceof FinalizePacket);
+    private BiPredicate<List<Packet>, Integer> hasPacketWithSequenceNumber =
+            (list, sequenceNumber) -> list.stream().anyMatch(packet -> packet.getSequenceNumber() == sequenceNumber);
+
 
     public Receiver(short transmissionId, int port, File dropOffFolder, InetAddress ackIp, int ackPort,
-                    OperatingMode operatingMode, int windowSize) {
+                    OperatingMode operatingMode, int windowSize, int windowTimeout, int duplicateAckDelay) {
         this.transmissionId = transmissionId;
         digest = new PacketDigest(dropOffFolder);
         try {
@@ -39,10 +46,12 @@ public class Receiver {
         this.ackPort = ackPort;
         this.operatingMode = operatingMode;
         this.windowSize = windowSize;
+        this.windowTimeout = windowTimeout;
         if (operatingMode == OperatingMode.SLIDING_WINDOW) {
             this.windowBuffer = new ArrayList<>();
             this.missingPackets = new Stack<>();
         }
+        this.duplicateAckDelay = duplicateAckDelay;
     }
 
     public void start() {
@@ -54,79 +63,31 @@ public class Receiver {
                 try {
                     socket.receive(udpPacket);
                 } catch (SocketTimeoutException ex) {
+                    // transmission of window is complete
                     if (operatingMode == OperatingMode.SLIDING_WINDOW) {
-                        // transmission of window is complete, now check for missing packets
-                        // otherwise continue bulk processing
-                        if (missingPackets.isEmpty() &&
-                                (windowBuffer.size() == windowSize
-                                        || (windowBuffer.stream().anyMatch(packet -> packet instanceof FinalizePacket)
-                                && windowBuffer.size() == transmissions.get(transmissionId) - windowStart + 2))) {
-                            retryMode = false;
-                            // System.out.println(windowBuffer.size());
-                            windowBuffer.sort(Comparator.comparing(Packet::getSequenceNumber));
-                            Packet lastPacket = windowBuffer.get(windowBuffer.size() - 1);
-                            sendAcknowledgementPacket(transmissionId, lastPacket.getSequenceNumber());
-
-                            for (Packet windowPacket : windowBuffer) {
-                                if (!digest.handlePacket(transmissionId, windowPacket)) {
-                                    System.err.println("Error while handling packet: " + windowPacket);
-                                }
-                            }
-
-                            // look at next window
-                            windowStart += windowSize;
-
-                            // next expected packet should be the first one of the next window
-                            expectedPacket = windowStart;
-
-                            if (windowBuffer.stream().anyMatch(packet -> packet instanceof FinalizePacket)) {
-                                socket.setSoTimeout(60000);
-                                expectedPacket = 0;
-                                windowStart = 0;
-                            }
-
-                            windowBuffer.clear();
+                        // check if window is ready for processing
+                        if (missingPackets.isEmpty() // process window only if there are no missing packets
+                                && (windowBuffer.size() == windowSize // check if window is completely filled
+                                || hasFinalizePacket.test(windowBuffer) // or if it is the last window
+                                    && windowBuffer.size() == transmissions.get(transmissionId) - windowStart + 2)) {
+                            processWindow();
                         } else {
-                            // first we check if the window is not complete
-                            if (windowBuffer.size() != windowSize) {
-                                windowBuffer.sort(Comparator.comparing(Packet::getSequenceNumber));
+                            // check for missing packets inside the window
+                            checkForMissingPackets();
 
-                                // System.out.println(windowBuffer.size());
-
-                                // add missing sequence numbers such that the window is full
-                                int range;
-                                if (windowStart + windowSize > transmissions.get(transmissionId)) {
-                                    range = transmissions.get(transmissionId);
-                                } else {
-                                    range = windowStart + windowSize;
-                                }
-                                for (int i = windowStart; i < range; i++) {
-                                    if (!windowBufferHasPacket(windowBuffer, i)
-                                            && missingPackets.search(i) == -1) {
-                                        missingPackets.push(i);
-                                    }
-                                }
-                            }
-
-                            // we retry a lost packet
-                            expectedPacket = missingPackets.pop();
-
-                            System.out.println("Requesting lost packet: " + expectedPacket);
-
-                            sendAcknowledgementPacket(transmissionId, expectedPacket);
-                            sendAcknowledgementPacket(transmissionId, expectedPacket);
-
-                            // TimeUnit.MILLISECONDS.sleep(20);
-
-                            retryMode = true;
+                            // request a lost packet
+                            requestMissingPacket(missingPackets.pop());
                         }
 
                         continue;
                     } else {
+                        // this should not happen, since we only set a timeout on the socket
+                        // if the SLIDING_WINDOW operating mode is set
                         System.err.println("Socket timed out!");
                     }
                 }
 
+                // parse packet
                 Packet packet;
                 int maxSequenceNumber;
                 int sequenceNumber = PacketInterpreter.getSequenceNumber(udpPacket.getData());
@@ -147,9 +108,9 @@ public class Receiver {
                     System.out.println("Received initialization packet at: " + System.currentTimeMillis());
 
                     // set timeout for socket in sliding window mode, since we have to
-                    // recognize once the transmitter is finished with sending a window
+                    // recognize that the transmitter is finished with sending a window
                     if (operatingMode == OperatingMode.SLIDING_WINDOW) {
-                        socket.setSoTimeout(50);
+                        socket.setSoTimeout(windowTimeout);
                     }
                 } else {
                     // no initialization packet seen before for this transmissionId -> abort transmission
@@ -180,21 +141,8 @@ public class Receiver {
                     } else {
                         System.err.println("Error while handling packet: " + packet);
                     }
-                } else {
+                } else { // SLIDING_WINDOW
                     windowBuffer.add(packet);
-
-                    /*if (packet.getSequenceNumber() != expectedPacket) {
-                        System.out.println("Expected packet: " + expectedPacket + " but got Packet: " +
-                                packet.getSequenceNumber());
-                        // missingPackets.push(expectedPacket);
-
-                        expectedPacket++;
-                    }
-
-                    if (!retryMode) {
-                        // we are still in correct order
-                        expectedPacket++;
-                    }*/
                 }
             } catch (Exception e) {
                 System.err.println(e);
@@ -204,8 +152,60 @@ public class Receiver {
         }
     }
 
-    private boolean windowBufferHasPacket(List<Packet> windowBuffer, int sequenceNumber) {
-        return windowBuffer.stream().anyMatch(windowPacket -> windowPacket.getSequenceNumber() == sequenceNumber);
+    private void processWindow() throws IOException {
+        // System.out.println(windowBuffer.size());
+        windowBuffer.sort(Comparator.comparing(Packet::getSequenceNumber));
+        Packet lastPacket = windowBuffer.get(windowBuffer.size() - 1);
+        sendAcknowledgementPacket(transmissionId, lastPacket.getSequenceNumber());
+
+        // handle packets like we do for all operating modes
+        for (Packet windowPacket : windowBuffer) {
+            if (!digest.handlePacket(transmissionId, windowPacket)) {
+                System.err.println("Error while handling packet: " + windowPacket);
+            }
+        }
+
+        // look at next window
+        windowStart += windowSize;
+
+        if (windowBuffer.stream().anyMatch(packet -> packet instanceof FinalizePacket)) {
+            socket.setSoTimeout(0); // reset timeout since no transmission is active
+            windowStart = 0;
+        }
+
+        windowBuffer.clear();
+    }
+
+    private void checkForMissingPackets() {
+        // first we check if the window is not complete
+        if (windowBuffer.size() != windowSize) {
+            windowBuffer.sort(Comparator.comparing(Packet::getSequenceNumber));
+
+            // System.out.println(windowBuffer.size());
+
+            // add missing sequence numbers such that the window is full
+            int range;
+            if (windowStart + windowSize > transmissions.get(transmissionId)) { // last window as range
+                range = transmissions.get(transmissionId);
+            } else {
+                range = windowStart + windowSize; // there is still another full window
+            }
+
+            for (int i = windowStart; i < range; i++) {
+                if (!hasPacketWithSequenceNumber.test(windowBuffer, i)
+                        && missingPackets.search(i) == -1) {
+                    missingPackets.push(i);
+                }
+            }
+        }
+    }
+
+    private void requestMissingPacket(int sequenceNumber) throws IOException, InterruptedException {
+        System.out.println("Requesting lost packet: " + sequenceNumber);
+
+        sendAcknowledgementPacket(transmissionId, sequenceNumber);
+        TimeUnit.MILLISECONDS.sleep(duplicateAckDelay);
+        sendAcknowledgementPacket(transmissionId, sequenceNumber);
     }
 
     private void sendAcknowledgementPacket(short transmissionId, int sequenceNumber) throws IOException {
@@ -213,7 +213,7 @@ public class Receiver {
 
         byte[] bytes = ackPacket.serialize();
 
-        System.out.println("Sent acknowledgement for Packet: " + sequenceNumber);
+        // System.out.println("Sent acknowledgement for Packet: " + sequenceNumber);
 
         DatagramPacket udpPacket = new DatagramPacket(bytes, bytes.length, this.ackIp, this.ackPort);
         this.socket.send(udpPacket);
