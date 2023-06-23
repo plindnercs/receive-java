@@ -153,8 +153,13 @@ public class Receiver {
 
     private void processWindow() throws IOException {
         // System.out.println(windowBuffer.size());
+
+        // choose last packet from window for acknowledgement
         windowBuffer.sort(Comparator.comparing(Packet::getSequenceNumber));
+
         Packet lastPacket = windowBuffer.get(windowBuffer.size() - 1);
+
+        // System.out.println("Sent cumulative acknowledgement for: " + lastPacket.getSequenceNumber());
         sendAcknowledgementPacket(transmissionId, lastPacket.getSequenceNumber());
 
         // handle packets like we do for all operating modes
@@ -187,7 +192,7 @@ public class Receiver {
             // add missing sequence numbers such that the window is full
             int range;
             if (windowStart + windowSize > transmissions.get(transmissionId)) { // last window as range
-                range = transmissions.get(transmissionId);
+                range = transmissions.get(transmissionId) + 2;
             } else {
                 range = windowStart + windowSize; // there is still another full window
             }
