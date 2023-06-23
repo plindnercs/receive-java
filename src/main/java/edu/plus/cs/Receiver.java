@@ -25,7 +25,7 @@ public class Receiver {
     private Stack<Integer> missingPackets;
     private int windowStart = 0;
     private int windowTimeout;
-    private int duplicateAckDelay = 0;
+    private int duplicateAckDelay;
     private Predicate<List<Packet>> hasFinalizePacket =
             list -> list.stream().anyMatch(packet -> packet instanceof FinalizePacket);
     private BiPredicate<List<Packet>, Integer> hasPacketWithSequenceNumber =
@@ -204,7 +204,7 @@ public class Receiver {
         System.out.println("Requesting lost packet: " + sequenceNumber);
 
         sendAcknowledgementPacket(transmissionId, sequenceNumber);
-        TimeUnit.MILLISECONDS.sleep(duplicateAckDelay);
+        TimeUnit.MILLISECONDS.sleep(duplicateAckDelay); // delay to avoid flooding the transmitter
         sendAcknowledgementPacket(transmissionId, sequenceNumber);
     }
 
