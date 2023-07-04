@@ -76,8 +76,10 @@ public class Receiver {
                             // check for missing packets inside the window
                             checkForMissingPackets();
 
-                            // request a lost packet
-                            requestMissingPacket(missingPackets.pop());
+                            if (!missingPackets.isEmpty()) {
+                                // request a lost packet
+                                requestMissingPacket(missingPackets.pop());
+                            }
                         }
 
                         continue;
